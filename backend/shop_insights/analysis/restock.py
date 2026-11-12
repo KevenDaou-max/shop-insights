@@ -7,7 +7,9 @@ The sales data has no inventory, so we plan from forecast demand:
        then use it until the next one lands)
   expected demand   = forecast units summed over the protection window
   safety stock      = z * weekly_std * sqrt(window weeks)
-      weekly_std: how much the product's weekly sales jump around (last 12 weeks).
+      weekly_std: how much the product's weekly sales jump around (last 12 weeks), measured
+                  robustly (1.4826 x median absolute deviation) so one giant wholesale order
+                  doesn't create a giant safety stock.
       sqrt: random ups and downs in different weeks partly cancel out, so uncertainty over
             4 weeks is sqrt(4) = 2x one week's, not 4x.
       z = 1.65: if demand is roughly normal, ~95% chance of not running out.

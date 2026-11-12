@@ -1,11 +1,11 @@
 {
   "timings_seconds": {
-    "load cleaned parquet": 0.067,
-    "trends (promote + dying)": 0.166,
-    "bought together (basket)": 0.445,
-    "forecast (train + predict)": 3.555,
-    "restock (with SAMPLE stock)": 0.022,
-    "backtest (all, 2 cutoffs)": 7.421
+    "load cleaned parquet": 0.109,
+    "trends (promote + dying)": 0.251,
+    "bought together (basket)": 0.611,
+    "forecast (train + predict)": 6.353,
+    "restock (with SAMPLE stock)": 0.051,
+    "backtest (all, 2 cutoffs)": 14.944
   },
   "backtest": {
     "available": true,
@@ -102,13 +102,13 @@
         "service_z": 1.65
       },
       "model_with_safety_stock": {
-        "ran_out_products": 30,
-        "ran_out_pct": 10.0,
-        "overstocked_products": 185,
-        "units_short": 14880,
-        "units_left_over": 226038,
-        "fill_rate_pct": 95.7,
-        "units_held": 557770
+        "ran_out_products": 40,
+        "ran_out_pct": 13.3,
+        "overstocked_products": 155,
+        "units_short": 26992,
+        "units_left_over": 164963,
+        "fill_rate_pct": 92.2,
+        "units_held": 484583
       },
       "model_forecast_only": {
         "ran_out_products": 110,

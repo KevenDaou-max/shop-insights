@@ -51,3 +51,11 @@ def test_moving_average_baseline_and_wape():
     assert baseline.loc["A"].tolist() == [35.0, 35.0]
     actual = pd.DataFrame({1: [30.0], 2: [40.0]}, index=["A"])
     assert _wape(actual, baseline) == (5 + 5) / 70 * 100
+
+
+def test_robust_std_ignores_one_spike_but_matches_std_on_normal_data():
+    from shop_insights.analysis.forecast import robust_std
+    spiky = np.array([[10, 12, 9, 11, 10, 5000, 11, 9, 10, 12, 10, 11]], dtype=float)
+    assert robust_std(spiky)[0] < 3 < spiky.std()
+    normal = np.random.default_rng(0).normal(100, 10, size=(1, 20000))
+    assert abs(robust_std(normal)[0] - 10) < 0.5

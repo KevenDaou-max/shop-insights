@@ -11,7 +11,7 @@ def summarize_orders(orders: pd.DataFrame) -> dict[str, Any]:
         "last_date": orders["invoice_date"].max().date().isoformat(),
         "orders": int(orders["invoice"].nunique()),
         "products": int(orders["stock_code"].nunique()),
-        "customers": int(orders["customer_id"].nunique()) if "customer_id" in orders else None,
+        "customers": int(orders["customer_id"].nunique()) or None,
         "countries": int(orders["country"].nunique()) if "country" in orders else None,
         "units_sold": int(orders["quantity"].sum()),
         "revenue": round(float(orders["revenue"].sum()), 2),

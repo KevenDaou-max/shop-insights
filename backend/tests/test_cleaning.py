@@ -36,3 +36,10 @@ def test_standardize_columns_accepts_aliases():
 def test_standardize_columns_reports_missing():
     with pytest.raises(SalesFileError, match="price"):
         standardize_columns(pd.DataFrame(columns=["Invoice", "StockCode", "Quantity", "InvoiceDate"]))
+
+
+def test_works_without_customer_column(raw_orders):
+    clean, report = clean_orders(raw_orders.drop(columns="customer_id"))
+    # Without customers the cancelled order 1004 can't be matched, so only the C-line is dropped.
+    assert report.removed["cancellations + the orders they cancelled"] == 1
+    assert "1004" in set(clean["invoice"].astype(str))

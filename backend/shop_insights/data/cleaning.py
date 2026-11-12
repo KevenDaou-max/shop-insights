@@ -34,8 +34,9 @@ def _coerce_types(df: pd.DataFrame) -> pd.DataFrame:
     out["quantity"] = pd.to_numeric(out["quantity"], errors="coerce")
     out["price"] = pd.to_numeric(out["price"], errors="coerce")
     out["invoice_date"] = pd.to_datetime(out["invoice_date"], errors="coerce")
-    if "customer_id" in out:
-        out["customer_id"] = pd.to_numeric(out["customer_id"], errors="coerce").astype("Int64")
+    # Customer ID is optional; without it cancellations can't be matched to orders, only dropped.
+    customer = out["customer_id"] if "customer_id" in out else pd.Series(pd.NA, index=out.index)
+    out["customer_id"] = pd.to_numeric(customer, errors="coerce").astype("Int64")
     if "description" not in out:
         out["description"] = pd.NA
     return out.dropna(subset=["quantity", "price", "invoice_date"])

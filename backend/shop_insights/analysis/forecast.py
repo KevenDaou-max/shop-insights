@@ -50,7 +50,7 @@ class Forecast:
     history: SalesHistory
     predictions: pd.DataFrame    # products x horizon (1..H), forecast units per week
     level: pd.Series             # recent average weekly units
-    weekly_std: pd.Series        # recent week-to-week variation (used for safety stock)
+    weekly_std: pd.Series        # robust spread of recent weekly sales (used for safety stock)
 
 
 def select_products(orders: pd.DataFrame, end: pd.Timestamp, top_n: int, extra: Iterable[str] = ()) -> pd.Index:
@@ -165,8 +165,22 @@ def forecast_sales(
         history=history,
         predictions=predict(model, history, horizon),
         level=pd.Series(recent.mean(axis=1), index=products),
-        weekly_std=pd.Series(history.units[:, -SELECTION_WEEKS:].std(axis=1, ddof=1), index=products),
+        weekly_std=pd.Series(robust_std(history.units[:, -SELECTION_WEEKS:]), index=products),
     )
+
+
+MAD_TO_STD = 1.4826   # for normally distributed data, std = 1.4826 x median absolute deviation
+
+
+def robust_std(weekly_units: np.ndarray) -> np.ndarray:
+    """How much weekly sales typically vary, per row, ignoring one-off spikes.
+
+    A plain standard deviation is blown up by a single 5,000-unit wholesale order, which then
+    turns into a huge safety stock. The median absolute deviation (MAD) only looks at the
+    typical distance from the typical week, and x1.4826 puts it on the same scale as a std.
+    """
+    median = np.median(weekly_units, axis=1, keepdims=True)
+    return MAD_TO_STD * np.median(np.abs(weekly_units - median), axis=1)
 
 
 # --- Simple baselines (what a shop owner might do without a model) -------------------
