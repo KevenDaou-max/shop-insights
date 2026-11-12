@@ -105,10 +105,13 @@ def dying_products(trends: pd.DataFrame, top_n: int = 20, min_units: int = MIN_U
     dying = trends[was_selling & (dropped | barely)].copy()
     dying["unit_loss"] = dying["previous_units"] - dying["recent_units"]
     dying["reason"] = (
-        np.where(
-            dying["recent_lines"] <= BARELY_SELLING_MAX_LINES,
-            "Barely selling: only " + dying["recent_lines"].astype(int).astype(str) + " order(s) recently",
-            "Units " + dying["growth_pct"].astype(str) + "% vs previous period",
+        np.select(
+            [dying["recent_lines"].eq(0), dying["recent_lines"] <= BARELY_SELLING_MAX_LINES],
+            [
+                "No orders in the recent period",
+                "Barely selling: only " + dying["recent_lines"].astype(int).astype(str) + " order(s) recently",
+            ],
+            default="Units " + dying["growth_pct"].astype(str) + "% vs previous period",
         )
         + _seasonal_note(dying, rising=False)
     )

@@ -1,0 +1,96 @@
+{
+  "timings_seconds": {
+    "load cleaned parquet": 0.101,
+    "trends (promote + dying)": 0.189,
+    "bought together (basket)": 0.427,
+    "forecast (train + predict)": 3.407,
+    "backtest (all, 2 cutoffs)": 7.706
+  },
+  "backtest": {
+    "available": true,
+    "cutoff": "2011-11-11",
+    "hidden_until": "2011-12-09",
+    "forecast": {
+      "products": 300,
+      "weeks": 4,
+      "actual_units": 346612,
+      "wape_pct": {
+        "model": 52.9,
+        "baseline_last_4_weeks_avg": 49.1,
+        "baseline_same_weeks_last_year": 83.5
+      },
+      "bias_pct": {
+        "model": 5.3,
+        "baseline_last_4_weeks_avg": -2.0,
+        "baseline_same_weeks_last_year": -23.1
+      },
+      "model_beats_4_week_avg_on_pct_of_products": 44.0
+    },
+    "forecast_previous_month": {
+      "products": 300,
+      "weeks": 4,
+      "actual_units": 302012,
+      "wape_pct": {
+        "model": 60.7,
+        "baseline_last_4_weeks_avg": 66.0,
+        "baseline_same_weeks_last_year": 88.3
+      },
+      "bias_pct": {
+        "model": -22.1,
+        "baseline_last_4_weeks_avg": -1.2,
+        "baseline_same_weeks_last_year": -19.6
+      },
+      "model_beats_4_week_avg_on_pct_of_products": 56.7
+    },
+    "trends": {
+      "promote": {
+        "model": {
+          "products": 20,
+          "hit_rate_pct": 50.0,
+          "median_growth_pct": 8.5,
+          "hidden_month_units": 79693
+        },
+        "baseline_last_month_best_sellers": {
+          "products": 20,
+          "hit_rate_pct": 35.0,
+          "median_growth_pct": -2.7,
+          "hidden_month_units": 83834
+        },
+        "explanation": "hit = product gained share of the shop's sales in the hidden month"
+      },
+      "dying": {
+        "model": {
+          "products": 20,
+          "hit_rate_pct": 60.0,
+          "hidden_month_units": 10002,
+          "earlier_normal_month_units": 22895
+        },
+        "baseline_last_month_worst_sellers": {
+          "products": 20,
+          "hit_rate_pct": 85.0,
+          "hidden_month_units": 748,
+          "earlier_normal_month_units": 3099
+        },
+        "explanation": "hit = product sold less than half of its earlier normal month in the hidden month"
+      },
+      "shop_growth_pct": 8.8
+    },
+    "bundles": {
+      "model_top_lift_pairs": {
+        "pairs": 20,
+        "pairs_seen_in_hidden_month": 16,
+        "pct_still_bought_together": 93.8,
+        "median_lift": 99.3,
+        "median_confidence_pct": 63.4
+      },
+      "baseline_most_common_pairs": {
+        "pairs": 20,
+        "pairs_seen_in_hidden_month": 20,
+        "pct_still_bought_together": 100.0,
+        "median_lift": 8.4,
+        "median_confidence_pct": 56.9
+      },
+      "explanation": "lift > 1 in the hidden month = the pair really was still bought together"
+    }
+  }
+}
