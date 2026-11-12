@@ -1,3 +1,4 @@
+import AiSummary from "./AiSummary.jsx";
 import { fmtInt, fmtMoney } from "../format.js";
 
 function Stat({ label, value }) {
@@ -9,7 +10,7 @@ function Stat({ label, value }) {
   );
 }
 
-export default function Overview({ result }) {
+export default function Overview({ result, summary }) {
   const { data, promote, dying, bundles, restock, settings, timings_seconds: timings, cached } = result;
   const bestBundle = bundles[0] ? `${bundles[0].description_a} + ${bundles[0].description_b}` : "none";
   return (
@@ -23,6 +24,8 @@ export default function Overview({ result }) {
         <Stat label="Units sold" value={fmtInt(data.units_sold)} />
         <Stat label="Revenue" value={fmtMoney(data.revenue)} />
       </div>
+
+      <AiSummary summary={summary} />
 
       <h3>Quick advice</h3>
       <ul className="advice">

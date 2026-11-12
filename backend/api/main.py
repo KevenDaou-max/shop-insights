@@ -6,6 +6,7 @@ pandas analysis doesn't freeze the server for other requests.
 import os
 from typing import Annotated, Any, Literal
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -13,8 +14,11 @@ from fastapi.responses import JSONResponse
 from api import service
 from api.uploads import read_limited
 from shop_insights.analysis.restock import RestockSettings
-from shop_insights.config import SAMPLE_STOCK_CSV
+from shop_insights import ai_summary
+from shop_insights.config import REPO_ROOT, SAMPLE_STOCK_CSV
 from shop_insights.data.loading import SalesFileError
+
+load_dotenv(REPO_ROOT / "backend" / ".env")  # GEMINI_API_KEY etc.; real env vars take priority
 
 MAX_SALES_MB = int(os.getenv("MAX_UPLOAD_MB", "100"))
 MAX_STOCK_MB = 5
@@ -43,7 +47,7 @@ def _response(analysis_id: str, result: dict[str, Any], cached: bool) -> dict[st
 
 @app.get("/api/health")
 def health() -> dict[str, Any]:
-    return {"status": "ok"}
+    return {"status": "ok", "ai_summary": ai_summary.summary_available()}
 
 
 @app.post("/api/analyses", status_code=status.HTTP_201_CREATED)
@@ -85,6 +89,21 @@ def _get_or_404(analysis_id: str) -> dict[str, Any]:
 @app.get("/api/analyses/{analysis_id}")
 def get_analysis(analysis_id: str) -> dict[str, Any]:
     return _get_or_404(analysis_id)
+
+
+# Declared before the generic /{section} route so "summary" isn't rejected as an unknown section.
+@app.get("/api/analyses/{analysis_id}/summary")
+def get_summary(analysis_id: str) -> dict[str, Any]:
+    """AI summary, generated on first request and cached. Never fails the page: errors come back as text."""
+    result = _get_or_404(analysis_id)
+    if "ai_summary" not in result:
+        if not ai_summary.summary_available():
+            return {"available": False, "text": None, "message": "Add GEMINI_API_KEY to backend/.env to enable the AI summary."}
+        try:
+            result["ai_summary"] = ai_summary.generate_summary(result)
+        except RuntimeError as exc:
+            return {"available": False, "text": None, "message": str(exc)}   # not cached: may work next time
+    return {"available": True, "text": result["ai_summary"], "message": None}
 
 
 @app.get("/api/analyses/{analysis_id}/{section}")

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { getSummary } from "../api.js";
 import Overview from "./Overview.jsx";
 import TrendSection from "./TrendSection.jsx";
 import BundlesSection from "./BundlesSection.jsx";
@@ -8,7 +9,7 @@ import BacktestSection from "./BacktestSection.jsx";
 
 // Every tab renders from the single result object fetched once; switching tabs never re-fetches.
 const TABS = [
-  { id: "overview", label: "Overview", render: (r) => <Overview result={r} /> },
+  { id: "overview", label: "Overview", render: (r, summary) => <Overview result={r} summary={summary} /> },
   { id: "promote", label: "Promote", render: (r) => <TrendSection kind="promote" rows={r.promote} /> },
   { id: "dying", label: "Dying", render: (r) => <TrendSection kind="dying" rows={r.dying} /> },
   { id: "bundles", label: "Bought together", render: (r) => <BundlesSection rows={r.bundles} /> },
@@ -25,6 +26,19 @@ function tabFromHash() {
 
 export default function Results({ result }) {
   const [tab, setTabState] = useState(tabFromHash);
+  const [summary, setSummary] = useState({ loading: true });
+
+  // The LLM summary is slower than the analysis, so it loads separately, once per analysis.
+  useEffect(() => {
+    let cancelled = false;
+    setSummary({ loading: true });
+    getSummary(result.id)
+      .then((data) => !cancelled && setSummary({ data }))
+      .catch((err) => !cancelled && setSummary({ error: err.message }));
+    return () => {
+      cancelled = true;
+    };
+  }, [result.id]);
 
   function setTab(id) {
     setTabState(id);
@@ -48,7 +62,7 @@ export default function Results({ result }) {
           </button>
         ))}
       </nav>
-      <section className="card" role="tabpanel">{current.render(result)}</section>
+      <section className="card" role="tabpanel">{current.render(result, summary)}</section>
     </>
   );
 }
