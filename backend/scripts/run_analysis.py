@@ -4,6 +4,7 @@ Usage (from backend/):  python -m scripts.run_analysis
 """
 import pandas as pd
 
+from shop_insights.analysis.basket import bought_together
 from shop_insights.analysis.trends import dying_products, product_trends, promote_products
 from shop_insights.data.store import load_clean_orders
 from shop_insights.timing import StepTimer
@@ -20,6 +21,8 @@ def main() -> None:
     with timer.step("trends (promote + dying)"):
         trends = product_trends(orders)
         promote, dying = promote_products(trends), dying_products(trends)
+    with timer.step("bought together (basket)"):
+        bundles = bought_together(orders)
 
     print("\nPROMOTE:\n", promote[["description", "recent_units", "previous_units", "reason"]].head(10))
     print("\nDYING:\n", dying[["description", "recent_units", "previous_units", "reason"]].head(10))
