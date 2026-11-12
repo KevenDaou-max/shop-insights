@@ -23,14 +23,14 @@ class SalesFileError(ValueError):
     """Raised when an uploaded file can't be used. The message is safe to show to the user."""
 
 
-def _normalize(name: str) -> str:
+def normalize_column_name(name: str) -> str:
     return str(name).strip().lower().replace(" ", "").replace("_", "").replace("-", "")
 
 
 def standardize_columns(df: pd.DataFrame) -> pd.DataFrame:
     """Rename known columns to snake_case names and drop everything else."""
     lookup = {alias: canonical for canonical, aliases in COLUMN_ALIASES.items() for alias in aliases}
-    renames = {col: lookup[_normalize(col)] for col in df.columns if _normalize(col) in lookup}
+    renames = {col: lookup[normalize_column_name(col)] for col in df.columns if normalize_column_name(col) in lookup}
     df = df.rename(columns=renames)
     missing = [c for c in REQUIRED_COLUMNS if c not in df.columns]
     if missing:

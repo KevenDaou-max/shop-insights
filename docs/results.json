@@ -1,10 +1,11 @@
 {
   "timings_seconds": {
-    "load cleaned parquet": 0.101,
-    "trends (promote + dying)": 0.189,
-    "bought together (basket)": 0.427,
-    "forecast (train + predict)": 3.407,
-    "backtest (all, 2 cutoffs)": 7.706
+    "load cleaned parquet": 0.067,
+    "trends (promote + dying)": 0.166,
+    "bought together (basket)": 0.445,
+    "forecast (train + predict)": 3.555,
+    "restock (with SAMPLE stock)": 0.022,
+    "backtest (all, 2 cutoffs)": 7.421
   },
   "backtest": {
     "available": true,
@@ -91,6 +92,43 @@
         "median_confidence_pct": 56.9
       },
       "explanation": "lift > 1 in the hidden month = the pair really was still bought together"
+    },
+    "restock": {
+      "products": 300,
+      "actual_units": 346612,
+      "settings": {
+        "lead_time_weeks": 2,
+        "coverage_weeks": 2,
+        "service_z": 1.65
+      },
+      "model_with_safety_stock": {
+        "ran_out_products": 30,
+        "ran_out_pct": 10.0,
+        "overstocked_products": 185,
+        "units_short": 14880,
+        "units_left_over": 226038,
+        "fill_rate_pct": 95.7,
+        "units_held": 557770
+      },
+      "model_forecast_only": {
+        "ran_out_products": 110,
+        "ran_out_pct": 36.7,
+        "overstocked_products": 87,
+        "units_short": 57387,
+        "units_left_over": 76038,
+        "fill_rate_pct": 83.4,
+        "units_held": 365263
+      },
+      "baseline_same_as_last_month": {
+        "ran_out_products": 153,
+        "ran_out_pct": 51.0,
+        "overstocked_products": 62,
+        "units_short": 64385,
+        "units_left_over": 57546,
+        "fill_rate_pct": 81.4,
+        "units_held": 339773
+      },
+      "explanation": "stock held = recommended level at the cutoff; compared with real sales in the hidden weeks"
     }
   }
 }

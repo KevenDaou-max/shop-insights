@@ -13,9 +13,10 @@ from shop_insights.analysis.basket import bought_together
 from shop_insights.analysis.forecast import (
     Forecast, forecast_sales, last_year_baseline, moving_average_baseline,
 )
+from shop_insights.analysis.restock import RestockSettings, needed_stock
 from shop_insights.analysis.trends import dying_products, product_trends, promote_products
 from shop_insights.analysis.weekly import DAYS_PER_WEEK, last_day, orders_until, weekly_matrix
-from shop_insights.config import HOLDOUT_DAYS, MIN_UNITS_FOR_TREND, TREND_WINDOW_WEEKS
+from shop_insights.config import HOLDOUT_DAYS, LEAD_TIME_WEEKS, MIN_UNITS_FOR_TREND, TREND_WINDOW_WEEKS
 
 LIST_SIZE = 20
 
@@ -184,6 +185,48 @@ def backtest_bundles(orders: pd.DataFrame, cutoff: pd.Timestamp) -> dict[str, An
     }
 
 
+# --- Restock --------------------------------------------------------------------------
+
+OVERSTOCK_RATIO = 1.5   # holding more than 1.5x what actually sold counts as overstocked
+
+
+def _score_stock_levels(stock: pd.Series, actual: pd.Series) -> dict[str, Any]:
+    """If the shop had held `stock` units at the cutoff, how did that compare with real demand?"""
+    short = (actual - stock).clip(lower=0)
+    leftover = (stock - actual).clip(lower=0)
+    return {
+        "ran_out_products": int((actual > stock).sum()),
+        "ran_out_pct": round(float((actual > stock).mean() * 100), 1),
+        "overstocked_products": int((stock > OVERSTOCK_RATIO * actual).sum()),
+        "units_short": int(short.sum()),
+        "units_left_over": int(leftover.sum()),
+        "fill_rate_pct": round(float((1 - short.sum() / actual.sum()) * 100), 1),
+        "units_held": int(stock.sum()),
+    }
+
+
+def backtest_restock(orders: pd.DataFrame, cutoff: pd.Timestamp, forecast: Forecast, weeks: int) -> dict[str, Any]:
+    """Would the stock levels recommended at the cutoff have covered the hidden weeks' demand?
+
+    Simplification: the shop starts the hidden period holding exactly the recommended level
+    (lead time + coverage = the hidden weeks), with no other deliveries in between.
+    """
+    settings = RestockSettings(lead_time_weeks=LEAD_TIME_WEEKS, coverage_weeks=weeks - LEAD_TIME_WEEKS)
+    plan = needed_stock(forecast, settings)
+    actual = _actual_units(orders, cutoff, weeks, forecast.history.products).sum(axis=1)
+    last_month = pd.Series(forecast.history.units[:, -weeks:].sum(axis=1), index=forecast.history.products)
+    return {
+        "products": len(actual),
+        "actual_units": int(actual.sum()),
+        "settings": {"lead_time_weeks": settings.lead_time_weeks, "coverage_weeks": settings.coverage_weeks,
+                     "service_z": settings.service_z},
+        "model_with_safety_stock": _score_stock_levels(plan["needed_stock"], actual),
+        "model_forecast_only": _score_stock_levels(np.ceil(plan["expected_demand"]), actual),
+        "baseline_same_as_last_month": _score_stock_levels(last_month, actual),
+        "explanation": "stock held = recommended level at the cutoff; compared with real sales in the hidden weeks",
+    }
+
+
 # --- Everything -----------------------------------------------------------------------
 
 MIN_WEEKS_FOR_BACKTEST = 30   # forecasting needs history before the cutoff, plus the hidden month
@@ -210,4 +253,5 @@ def run_backtest(orders: pd.DataFrame, holdout_days: int = HOLDOUT_DAYS) -> dict
         "forecast_previous_month": validation_score,
         "trends": backtest_trends(orders, cutoff, weeks),
         "bundles": backtest_bundles(orders, cutoff),
+        "restock": backtest_restock(orders, cutoff, forecast, weeks),
     }

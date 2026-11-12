@@ -10,8 +10,10 @@ import pandas as pd
 from shop_insights.analysis.backtest import run_backtest
 from shop_insights.analysis.basket import bought_together
 from shop_insights.analysis.forecast import forecast_sales, forecast_table
+from shop_insights.analysis.restock import RestockSettings, read_stock_bytes, restock_plan
 from shop_insights.analysis.trends import dying_products, product_trends, promote_products
-from shop_insights.config import FORECAST_TOP_N, REPO_ROOT
+from shop_insights.analysis.weekly import product_names
+from shop_insights.config import FORECAST_TOP_N, REPO_ROOT, SAMPLE_STOCK_CSV
 from shop_insights.data.store import load_clean_orders
 from shop_insights.timing import StepTimer
 
@@ -33,6 +35,9 @@ def main() -> None:
     with timer.step("forecast (train + predict)"):
         forecast = forecast_sales(orders, horizon=4)
         top_forecast = forecast_table(forecast, orders, FORECAST_TOP_N)
+    with timer.step("restock (with SAMPLE stock)"):
+        stock = read_stock_bytes(SAMPLE_STOCK_CSV.read_bytes(), SAMPLE_STOCK_CSV.name)
+        restock = restock_plan(forecast, product_names(orders), RestockSettings(), stock)
     with timer.step("backtest (all, 2 cutoffs)"):
         backtest = run_backtest(orders)
 
@@ -40,6 +45,8 @@ def main() -> None:
     print("\nDYING:\n", dying[["description", "recent_units", "previous_units", "reason"]].head(10))
     print("\nBOUGHT TOGETHER:\n", bundles[["description_a", "description_b", "orders_together", "lift"]].head(10))
     print("\nFORECAST (next week):\n", top_forecast[["description", "next_week", "last_4_weeks_avg"]].head(10))
+    print("\nRESTOCK (SAMPLE stock):\n",
+          restock[["description", "current_stock", "recommended_quantity", "weeks_of_stock_left"]].head(10))
     print("\nBACKTEST:\n", json.dumps(backtest, indent=1))
 
     RESULTS_FILE.parent.mkdir(exist_ok=True)
