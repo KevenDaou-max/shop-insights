@@ -40,8 +40,8 @@ export default function Overview({ result, summary }) {
       </ul>
 
       <p className="muted small">
-        Analysis time: {Object.entries(timings).map(([step, s]) => `${step} ${s.toFixed(2)}s`).join(" · ")}
-        {cached && " · served from cache"}
+        {cached ? "Served from cache. Times measured when this result was first computed: " : "Analysis time (this run): "}
+        {Object.entries(timings).map(([step, s]) => `${step} ${s.toFixed(2)}s`).join(" · ")}
       </p>
     </>
   );

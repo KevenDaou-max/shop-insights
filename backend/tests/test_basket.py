@@ -46,3 +46,14 @@ def test_support_confidence_lift():
 def test_rare_products_are_ignored():
     pairs = pair_counts(_baskets(), min_product_orders=6, min_pair_orders=1)
     assert set(pairs["product_a"]) | set(pairs["product_b"]) == {"A", "C"}
+
+
+def test_same_product_under_two_codes_is_not_a_bundle():
+    from shop_insights.analysis.basket import drop_same_product_pairs, normalize_description
+
+    assert normalize_description(pd.Series(["METAL SIGN,CUPCAKE  SINGLE HOOK "]))[0] == "metal sign cupcake single hook"
+    pairs = pd.DataFrame({
+        "description_a": ["METAL SIGN CUPCAKE SINGLE HOOK", "RED MUG"],
+        "description_b": ["METAL SIGN,CUPCAKE SINGLE HOOK", "BLUE MUG"],
+    })
+    assert drop_same_product_pairs(pairs)["description_a"].tolist() == ["RED MUG"]

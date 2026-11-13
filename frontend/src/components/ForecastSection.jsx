@@ -10,6 +10,14 @@ const columns = [
   { key: "forecast", label: "Next 4 weeks", numeric: true, format: (f) => f.map(fmtInt).join(" · ") },
 ];
 
+// A forecast week ending 24 Dec – 7 Jan covers the Christmas/New Year break.
+function includesHolidayWeek(weeks) {
+  return weeks.some((iso) => {
+    const d = new Date(iso);
+    return (d.getMonth() === 11 && d.getDate() >= 24) || (d.getMonth() === 0 && d.getDate() <= 7);
+  });
+}
+
 export default function ForecastSection({ forecast }) {
   const [code, setCode] = useState(forecast.products[0]?.stock_code);
   const product = forecast.products.find((p) => p.stock_code === code);
@@ -30,6 +38,11 @@ export default function ForecastSection({ forecast }) {
       </label>
       {product && (
         <ForecastChart product={product} historyWeeks={forecast.history_weeks} forecastWeeks={forecast.forecast_weeks} />
+      )}
+      {includesHolidayWeek(forecast.forecast_weeks) && (
+        <p className="note">
+          The near-zero week is the shop's Christmas/New Year closure: the model learned it from the same weeks last year.
+        </p>
       )}
       <DataTable columns={columns} rows={forecast.products} rowKey={(r) => r.stock_code} />
     </>

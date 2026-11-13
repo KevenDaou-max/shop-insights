@@ -219,7 +219,7 @@ def backtest_restock(orders: pd.DataFrame, cutoff: pd.Timestamp, forecast: Forec
         "products": len(actual),
         "actual_units": int(actual.sum()),
         "settings": {"lead_time_weeks": settings.lead_time_weeks, "coverage_weeks": settings.coverage_weeks,
-                     "service_z": settings.service_z},
+                     "service_z": settings.service_z, "max_safety_weeks": settings.max_safety_weeks},
         "model_with_safety_stock": _score_stock_levels(plan["needed_stock"], actual),
         "model_forecast_only": _score_stock_levels(np.ceil(plan["expected_demand"]), actual),
         "baseline_same_as_last_month": _score_stock_levels(last_month, actual),

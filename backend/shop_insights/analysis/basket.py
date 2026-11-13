@@ -30,6 +30,21 @@ def _recent_baskets(orders: pd.DataFrame, end: pd.Timestamp, lookback_weeks: int
     return baskets.assign(invoice=baskets["invoice"].astype(str), stock_code=baskets["stock_code"].astype(str))
 
 
+def normalize_description(names: pd.Series) -> pd.Series:
+    """Lowercase, punctuation -> space, collapse spaces: 'METAL SIGN,CUPCAKE' == 'metal sign cupcake'."""
+    return (
+        names.astype(str).str.lower()
+        .str.replace(r"[^a-z0-9]+", " ", regex=True)
+        .str.strip()
+    )
+
+
+def drop_same_product_pairs(pairs: pd.DataFrame) -> pd.DataFrame:
+    """Remove pairs that are one product listed under two codes (a data-entry artefact, not a bundle)."""
+    same = normalize_description(pairs["description_a"]) == normalize_description(pairs["description_b"])
+    return pairs[~same.to_numpy()]
+
+
 def pair_counts(baskets: pd.DataFrame, min_product_orders: int, min_pair_orders: int) -> pd.DataFrame:
     """Co-occurrence counts for every product pair seen together in >= min_pair_orders orders."""
     product_orders = baskets["stock_code"].value_counts()
@@ -83,6 +98,7 @@ def bought_together(
     names = product_names(orders)
     pairs.insert(1, "description_a", pairs["product_a"].map(names))
     pairs.insert(3, "description_b", pairs["product_b"].map(names))
+    pairs = drop_same_product_pairs(pairs)
     top = pairs.sort_values(["lift", "orders_together"], ascending=False).head(top_n).reset_index(drop=True)
     best_conf = top[["confidence_a_to_b", "confidence_b_to_a"]].max(axis=1)
     top["reason"] = (

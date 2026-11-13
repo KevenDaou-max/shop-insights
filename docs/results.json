@@ -1,11 +1,11 @@
 {
   "timings_seconds": {
-    "load cleaned parquet": 0.109,
-    "trends (promote + dying)": 0.251,
-    "bought together (basket)": 0.611,
-    "forecast (train + predict)": 6.353,
-    "restock (with SAMPLE stock)": 0.051,
-    "backtest (all, 2 cutoffs)": 14.944
+    "load cleaned parquet": 0.102,
+    "trends (promote + dying)": 0.896,
+    "bought together (basket)": 3.951,
+    "forecast (train + predict)": 28.15,
+    "restock (with SAMPLE stock)": 0.029,
+    "backtest (all, 2 cutoffs)": 45.945
   },
   "backtest": {
     "available": true,
@@ -81,8 +81,8 @@
         "pairs": 20,
         "pairs_seen_in_hidden_month": 16,
         "pct_still_bought_together": 93.8,
-        "median_lift": 99.3,
-        "median_confidence_pct": 63.4
+        "median_lift": 64.5,
+        "median_confidence_pct": 61.5
       },
       "baseline_most_common_pairs": {
         "pairs": 20,
@@ -99,16 +99,17 @@
       "settings": {
         "lead_time_weeks": 2,
         "coverage_weeks": 2,
-        "service_z": 1.65
+        "service_z": 1.65,
+        "max_safety_weeks": 2
       },
       "model_with_safety_stock": {
-        "ran_out_products": 40,
-        "ran_out_pct": 13.3,
-        "overstocked_products": 155,
-        "units_short": 26992,
-        "units_left_over": 164963,
-        "fill_rate_pct": 92.2,
-        "units_held": 484583
+        "ran_out_products": 44,
+        "ran_out_pct": 14.7,
+        "overstocked_products": 153,
+        "units_short": 28172,
+        "units_left_over": 160075,
+        "fill_rate_pct": 91.9,
+        "units_held": 478515
       },
       "model_forecast_only": {
         "ran_out_products": 110,

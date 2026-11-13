@@ -69,7 +69,7 @@ Click **Run demo analysis**, or upload your own file. To try the restock upload,
 Other useful commands (from `backend/`, with the venv active):
 
 ```powershell
-python -m pytest                    # 33 tests
+python -m pytest                    # 38 tests
 python -m scripts.run_analysis      # every step on the full dataset: prints timings + backtest, writes docs/results.json
 python -m scripts.make_sample_stock # regenerate the SAMPLE stock file
 ```
@@ -146,6 +146,11 @@ Efficient version: only products in 100+ orders are kept. They go into a **spars
 orders × products matrix `X` (SciPy), and **`Xᵀ·X`** gives every pair's co-occurrence count
 in one multiplication. That's 0.4–0.7 s instead of building a 40,000 × 4,000 dense table.
 
+Pairs that are **one product under two codes** are dropped: both descriptions are lowercased,
+punctuation becomes a space, and extra spaces are collapsed. If the results match, the pair
+isn't a bundle. For example, "METAL SIGN CUPCAKE SINGLE HOOK" and "METAL SIGN,CUPCAKE SINGLE
+HOOK" are the same sign.
+
 ### Forecast (`forecast.py`)
 
 - **One global model** (scikit-learn `HistGradientBoostingRegressor`, Poisson loss), trained
@@ -161,7 +166,8 @@ in one multiplication. That's 0.4–0.7 s instead of building a 40,000 × 4,000 
 - Baselines: *average of the last 4 weeks* and *same weeks last year*.
 
 The shop closes over Christmas. The model learned that from last year's same weeks, so the
-week ending 30 Dec is forecast at almost zero.
+week ending 30 Dec is forecast at almost zero. The forecast tab explains this whenever a
+forecast week falls over Christmas/New Year.
 
 ### Restock (`restock.py`)
 
@@ -171,6 +177,7 @@ The sales data has no stock levels, so the plan starts from forecast demand:
 protection window = lead time + coverage        (default 2 + 2 = 4 weeks; both adjustable)
 expected demand   = forecast units summed over the window
 safety stock      = z × weekly variation × √(window weeks)       z = 1.65 ≈ 95% no stock-out
+                    capped at 2 × expected weekly demand
 needed stock      = expected demand + safety stock
 units to order    = max(0, needed stock − current stock)         (if a stock file is uploaded)
 weeks of stock    = current stock ÷ expected weekly demand
@@ -183,6 +190,15 @@ weeks of stock    = current stock ÷ expected weekly demand
 - **Weekly variation** is measured robustly: 1.4826 × the median absolute deviation of the
   last 12 weeks. That equals the standard deviation for normal data, but one 5,000-unit
   wholesale order can't blow it up.
+- **Cap: safety stock is at most 2 weeks of expected demand** (`MAX_SAFETY_STOCK_WEEKS` in
+  `config.py`). The formula assumes demand is steady with random noise. For an item at the
+  end of its season, the last 12 weeks contain the whole seasonal ramp-up, so the "variation"
+  is huge. Before the cap, HANGING HEART WITH BELL (~40/week) got 1,133 safety units, and
+  RABBIT NIGHT LIGHT (~1,100/week) got 10,292. Why 2 weeks? Extra stock is insurance against
+  a surprise. Two weeks is one default lead time, enough to survive a delivery that is a full
+  cycle late; anything beyond that mostly ties up cash in stock that may never sell. The value
+  was chosen by this reasoning, **not tuned on the hidden test month**. With the cap, those
+  two products get 79 and 2,218 safety units. Capped rows say so in their reason text.
 - **With a stock file:** only products below the needed level are listed, most urgent first.
   The row is flagged **URGENT** when stock runs out before a new delivery could arrive.
   **Without one:** you get the recommended stock level for each product.
@@ -242,11 +258,13 @@ replaced it before reporting.)
 
 | Pairs | Seen in hidden month | Still bought together (lift > 1) | Median lift | Median confidence |
 |---|---:|---:|---:|---:|
-| **Model (highest lift)** | 16 / 20 | 93.8% | **99.3×** | **63.4%** |
+| **Model (highest lift)** | 16 / 20 | 93.8% | **64.5×** | **61.5%** |
 | Most common pairs (baseline) | 20 / 20 | 100% | 8.4× | 56.9% |
 
 The high-lift pairs held up on new orders. The baseline pairs are more common, but they are
-mostly best sellers that appear together by volume.
+mostly best sellers that appear together by volume. (Before same-product pairs were filtered
+out, the model's median lift was 99.3× and its median confidence 63.4%. Duplicate codes for
+one product look like a "perfect" pair, which inflated those numbers.)
 
 ### Restock: 300 products, lead time 2 + coverage 2 weeks
 
@@ -254,7 +272,7 @@ mostly best sellers that appear together by volume.
 
 | Strategy | Ran out | Fill rate | Units short | Units left over | Overstocked (>1.5× demand) |
 |---|---:|---:|---:|---:|---:|
-| **Model + safety stock** | **40 (13.3%)** | **92.2%** | **26,992** | 164,963 | 155 |
+| **Model + capped safety stock** | **44 (14.7%)** | **91.9%** | **28,172** | 160,075 | 153 |
 | Model forecast only | 110 (36.7%) | 83.4% | 57,387 | 76,038 | 87 |
 | Same as last month (baseline) | 153 (51.0%) | 81.4% | 64,385 | **57,546** | **62** |
 
@@ -263,16 +281,17 @@ Change history (also reported honestly): the first version used a plain standard
 It ran out on only 30 products (10.0%, fill rate 95.7%) but held 557,770 units, with 226,038
 left over. A live run then gave a 40-unit-a-week product 855 units of safety stock, because
 of one wholesale order. Switching to the robust measure cut leftovers by 61k units, at the
-cost of 10 more stock-outs.
+cost of 10 more stock-outs (40 ran out, fill rate 92.2%, 164,963 left over). The 2-week cap
+then changed little in this backtest: 44 ran out (+4), 4,888 fewer units left over. At the
+mid-November cutoff, most seasonal items still had high expected demand, so the cap rarely
+applied. It matters most later, when a season ends, like the December examples above.
 
 ### Known limitations
 
 - **Forecast vs baseline:** not clearly better than a 4-week average (see above).
-- **Seasonal safety stock:** for an item at the end of its season, the last 12 weeks include
-  the whole seasonal ramp-up. Its "weekly variation" is then large, and so is its safety
-  stock (e.g. 1,133 units for ~40/week). The proper fix is to base safety stock on the
-  model's own past forecast errors. I didn't add it, because tuning again against the same
-  hidden month would overfit the test.
+- **Seasonal safety stock:** the 2-week cap stops absurd values, but it is a rule of thumb.
+  The proper fix is to base safety stock on the model's own past forecast errors instead of
+  raw weekly variation.
 - **One test month:** the backtest is a single 4-week window (plus one extra forecast month)
   in the Christmas season. Rolling backtests over many months would give firmer numbers.
 - The restock backtest assumes you start the month holding the recommended level, with no
@@ -283,22 +302,25 @@ cost of 10 more stock-outs.
 ## Performance
 
 Measured on the full dataset (997k clean rows) with `python -m scripts.run_analysis` on a
-laptop (Intel i7-13620H, plugged in):
+laptop (Intel i7-13620H, **plugged in**). These are from the latest plugged-in run, before the
+safety-stock cap and duplicate-pair filter were added. Both add only one vectorized operation.
 
 | Step | Time |
 |---|---:|
 | Read Excel (calamine engine) + clean + save Parquet (`prepare_data`, once) | 14.4 s |
-| Load cleaned Parquet | 0.07 s |
-| Promote + dying | 0.17 s |
-| Bought together (sparse) | 0.44 s |
-| Forecast: build features, train, predict (300 products) | 3.6 s |
-| Restock (with stock file) | 0.02 s |
-| Full backtest (trends, bundles, restock, forecast at 2 cutoffs) | 7.8 s |
+| Load cleaned Parquet | 0.65 s |
+| Promote + dying | 0.32 s |
+| Bought together (sparse) | 0.73 s |
+| Forecast: build features, train, predict (300 products) | 5.00 s |
+| Restock (with stock file) | 0.04 s |
+| Full backtest (trends, bundles, restock, forecast at 2 cutoffs) | 10.62 s |
 
 Through the API: the demo analysis took **14.2 s** the first time and **0.22 s** when repeated
 (cache). Uploading the original 45 MB Excel file took **31.8 s**, then **0.46 s** when uploaded
-again, since the file is only hashed. On battery power-saving the same laptop ran about 3–4×
-slower, so measure while plugged in.
+again, since the file is only hashed. On battery power-saving the same laptop runs about 3–5×
+slower (e.g. forecast 28 s, backtest 46 s), so measure while plugged in. `docs/results.json`
+holds the timings of whichever run wrote it last; the dashboard shows the timings of the run
+that produced the result it is displaying.
 
 How it stays fast:
 - vectorized pandas/NumPy everywhere: `groupby`/`unstack` for weekly tables, one matrix

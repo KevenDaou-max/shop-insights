@@ -56,3 +56,17 @@ def test_score_stock_levels():
     assert score["ran_out_products"] == 1 and score["units_short"] == 10
     assert score["overstocked_products"] == 1 and score["units_left_over"] == 30
     assert score["fill_rate_pct"] == 75.0
+
+
+def test_safety_stock_is_capped_at_weeks_of_demand():
+    # ~10/week but very jumpy history: uncapped safety = 1.65 * 100 * 2 = 330 units.
+    plan = restock_plan(_forecast(weekly=10, std=100), NAMES, RestockSettings(2, 2, 1.65, max_safety_weeks=2))
+    assert (plan["safety_stock"] == 20).all()             # 2 weeks x 10/week
+    assert (plan["recommended_quantity"] == 40 + 20).all()
+    assert plan["safety_capped"].all()
+    assert "capped at 2 weeks" in plan["reason"].iloc[0]
+
+
+def test_cap_does_not_touch_normal_products():
+    plan = restock_plan(_forecast(weekly=10, std=2), NAMES, RestockSettings(2, 2, 1.65, max_safety_weeks=2))
+    assert not plan["safety_capped"].any()

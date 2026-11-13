@@ -60,6 +60,7 @@ def analyze(
             "lead_time_weeks": settings.lead_time_weeks,
             "coverage_weeks": settings.coverage_weeks,
             "service_z": settings.service_z,
+            "max_safety_weeks": settings.max_safety_weeks,
             "stock_file": current_stock is not None,
         },
         "promote": to_records(promote),

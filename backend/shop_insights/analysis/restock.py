@@ -13,6 +13,10 @@ The sales data has no inventory, so we plan from forecast demand:
       sqrt: random ups and downs in different weeks partly cancel out, so uncertainty over
             4 weeks is sqrt(4) = 2x one week's, not 4x.
       z = 1.65: if demand is roughly normal, ~95% chance of not running out.
+      cap: safety stock <= MAX_SAFETY_STOCK_WEEKS (2) x expected weekly demand. Without it, an
+           item at the end of its season (whose last 12 weeks include the whole seasonal ramp)
+           got e.g. 1,133 safety units for ~40 sales/week. The formula assumes demand is
+           stable with random noise; when it isn't, the cap stops it from going wild.
   needed stock      = expected demand + safety stock
   units to order    = max(0, needed stock - current stock)    (only if a stock file is given)
 """
@@ -24,7 +28,7 @@ import numpy as np
 import pandas as pd
 
 from shop_insights.analysis.forecast import Forecast
-from shop_insights.config import COVERAGE_WEEKS, LEAD_TIME_WEEKS, SERVICE_LEVEL_Z
+from shop_insights.config import COVERAGE_WEEKS, LEAD_TIME_WEEKS, MAX_SAFETY_STOCK_WEEKS, SERVICE_LEVEL_Z
 from shop_insights.data.loading import SalesFileError, normalize_column_name
 
 STOCK_CODE_ALIASES = {"stockcode", "sku", "productid", "productcode"}
@@ -36,6 +40,7 @@ class RestockSettings:
     lead_time_weeks: int = LEAD_TIME_WEEKS
     coverage_weeks: int = COVERAGE_WEEKS
     service_z: float = SERVICE_LEVEL_Z
+    max_safety_weeks: float = MAX_SAFETY_STOCK_WEEKS
 
     @property
     def window_weeks(self) -> int:
@@ -69,11 +74,15 @@ def needed_stock(forecast: Forecast, settings: RestockSettings) -> pd.DataFrame:
     if missing:
         raise ValueError(f"Forecast horizon too short for a {weeks}-week window.")
     demand = forecast.predictions[list(range(1, weeks + 1))].sum(axis=1)
-    safety = settings.service_z * forecast.weekly_std.fillna(0) * math.sqrt(weeks)
+    weekly_demand = demand / weeks
+    uncapped = settings.service_z * forecast.weekly_std.fillna(0) * math.sqrt(weeks)
+    cap = settings.max_safety_weeks * weekly_demand
+    safety = np.minimum(uncapped, cap)
     return pd.DataFrame({
-        "expected_weekly_demand": demand / weeks,
+        "expected_weekly_demand": weekly_demand,
         "expected_demand": demand,
         "safety_stock": safety,
+        "safety_capped": uncapped > cap,
         "needed_stock": np.ceil(demand + safety),
     })
 
@@ -105,6 +114,7 @@ def restock_plan(
             "Hold this much: ~" + plan["expected_weekly_demand"].round(0).astype(int).astype(str)
             + "/week for " + window + " + " + plan["safety_stock"].round(0).astype(int).astype(str)
             + " safety units"
+            + np.where(plan["safety_capped"], " (capped at " + str(settings.max_safety_weeks) + " weeks of demand)", "")
         )
         plan = plan.sort_values("expected_demand", ascending=False)
     else:

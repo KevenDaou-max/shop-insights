@@ -26,6 +26,9 @@ FORECAST_TOP_N = 50
 LEAD_TIME_WEEKS = 2
 COVERAGE_WEEKS = 2
 SERVICE_LEVEL_Z = 1.65           # ~95% chance of not running out (one-sided normal)
+# Safety stock may not exceed this many weeks of expected demand. Fixed by reasoning, not tuned:
+# 2 weeks = one default lead time, enough to survive a delivery that is a full cycle late.
+MAX_SAFETY_STOCK_WEEKS = 2
 
 # Backtest
 HOLDOUT_DAYS = 28
