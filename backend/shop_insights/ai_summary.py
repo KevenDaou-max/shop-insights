@@ -5,8 +5,11 @@ already produced and ask it to explain them. That keeps every figure traceable t
 and the instructions forbid inventing numbers. Without GEMINI_API_KEY the app skips this.
 """
 import json
+import logging
 import os
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_MODEL = "gemini-3-flash-preview"   # free-tier Flash model; override with GEMINI_MODEL
 TOP = 5
@@ -60,6 +63,23 @@ def build_prompt(result: dict[str, Any]) -> str:
     return f"{INSTRUCTIONS}\n\nFACTS (JSON):\n{json.dumps(build_facts(result), indent=1)}"
 
 
+def gemini_model() -> str:
+    return os.getenv("GEMINI_MODEL") or DEFAULT_MODEL   # `or`: an empty GEMINI_MODEL= line means default
+
+
+def friendly_error(code: int | None, model: str) -> str:
+    """Short message for the dashboard; the raw Gemini error goes to the server log instead."""
+    if code == 404:
+        return f"The AI model '{model}' isn't available. Check GEMINI_MODEL in backend/.env."
+    if code in (400, 401, 403):   # Gemini answers 400 API_KEY_INVALID for a wrong key
+        return "Gemini rejected the request. Check GEMINI_API_KEY in backend/.env."
+    if code == 429:
+        return "The free Gemini quota is used up for now. Try again in a minute."
+    if code is not None and code >= 500:
+        return "Gemini is having problems right now. Try again later."
+    return "The AI summary couldn't be created right now. The rest of the analysis is unaffected."
+
+
 def summary_available() -> bool:
     return bool(os.getenv("GEMINI_API_KEY"))
 
@@ -70,14 +90,19 @@ def generate_summary(result: dict[str, Any]) -> str:
     if not api_key:
         raise RuntimeError("No GEMINI_API_KEY set; the AI summary is turned off.")
     from google import genai  # imported lazily so the app starts fine without the package/key
+    from google.genai import errors, types
 
+    model = gemini_model()
     try:
-        client = genai.Client(api_key=api_key)
-        response = client.models.generate_content(
-            model=os.getenv("GEMINI_MODEL", DEFAULT_MODEL), contents=build_prompt(result)
-        )
-    except Exception as exc:  # network, quota, invalid key... the dashboard still works without it
-        raise RuntimeError(f"Gemini request failed: {exc}") from exc
+        # Preview models (e.g. gemini-3-flash-preview) only exist on the v1beta API version.
+        client = genai.Client(api_key=api_key, http_options=types.HttpOptions(api_version="v1beta"))
+        response = client.models.generate_content(model=model, contents=build_prompt(result))
+    except errors.APIError as exc:
+        logger.warning("Gemini API error %s for model %s: %s", exc.code, model, exc.message)
+        raise RuntimeError(friendly_error(exc.code, model)) from exc
+    except Exception as exc:  # network problems, timeouts... the dashboard still works without it
+        logger.warning("Gemini request failed for model %s: %r", model, exc)
+        raise RuntimeError(friendly_error(None, model)) from exc
     if not response.text:
-        raise RuntimeError("Gemini returned an empty answer.")
+        raise RuntimeError(friendly_error(None, model))
     return response.text.strip()

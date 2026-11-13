@@ -36,3 +36,35 @@ def test_summary_endpoint_caches_generated_text(monkeypatch):
     assert client.get("/api/analyses/xyz/summary").json()["text"] == "Promote P0."
     client.get("/api/analyses/xyz/summary")
     assert len(calls) == 1
+
+
+def test_model_comes_from_env_with_default(monkeypatch):
+    monkeypatch.delenv("GEMINI_MODEL", raising=False)
+    assert ai_summary.gemini_model() == "gemini-3-flash-preview"
+    monkeypatch.setenv("GEMINI_MODEL", "")
+    assert ai_summary.gemini_model() == "gemini-3-flash-preview"
+    monkeypatch.setenv("GEMINI_MODEL", "gemini-3.5-flash")
+    assert ai_summary.gemini_model() == "gemini-3.5-flash"
+
+
+def test_api_errors_become_short_friendly_messages(monkeypatch):
+    from google.genai import errors
+
+    class FailingModels:
+        def generate_content(self, **_):
+            raise errors.ClientError(404, {"error": {"code": 404, "message": "models/x is not found", "status": "NOT_FOUND"}})
+
+    class FakeClient:
+        def __init__(self, api_key, http_options):
+            assert http_options.api_version == "v1beta"
+            self.models = FailingModels()
+
+    monkeypatch.setenv("GEMINI_API_KEY", "fake")
+    monkeypatch.setenv("GEMINI_MODEL", "x")
+    monkeypatch.setattr("google.genai.Client", FakeClient)
+    try:
+        ai_summary.generate_summary(RESULT)
+    except RuntimeError as exc:
+        message = str(exc)
+    assert message == "The AI model 'x' isn't available. Check GEMINI_MODEL in backend/.env."
+    assert "{" not in message and "NOT_FOUND" not in message
